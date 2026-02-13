@@ -9,6 +9,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "lucide-react";
 
+import { Plus, ShoppingCart } from "lucide-react";
+import Link from "next/link";
+
 export default async function SalesPage() {
     const supabase = await createClient();
     // Placeholder fetching - real table might be 'sales' or 'orders'
@@ -19,9 +22,18 @@ export default async function SalesPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold text-text-primary">Histórico de Vendas</h1>
-                <p className="text-text-secondary mt-1">Visualize todas as transações realizadas.</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-text-primary uppercase tracking-wider">Histórico de Vendas</h1>
+                    <p className="text-text-secondary mt-1">Visualize todas as transações realizadas.</p>
+                </div>
+                <Link
+                    href="/sales/new"
+                    className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white font-bold rounded-xl shadow-lg shadow-accent/20 transition-all active:scale-95"
+                >
+                    <Plus className="w-5 h-5" />
+                    <span>Nova Venda</span>
+                </Link>
             </div>
 
             <div className="card-gradient rounded-xl overflow-hidden">
