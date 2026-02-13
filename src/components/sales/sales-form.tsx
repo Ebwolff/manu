@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Trash2, ShoppingCart, CreditCard, Banknote, QrCode, AlertCircle } from "lucide-react"
+import { Trash2, ShoppingCart, CreditCard, Banknote, QrCode, AlertCircle, Percent, DollarSign } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,6 +30,8 @@ export function SalesForm() {
     const [paymentMethod, setPaymentMethod] = useState('pix')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent')
+    const [discountValue, setDiscountValue] = useState(0)
 
     const addToCart = (product: any) => {
         setCart(prev => {
@@ -49,7 +51,11 @@ export function SalesForm() {
         setCart(prev => prev.filter(item => item.id !== id))
     }
 
-    const total = cart.reduce((sum, item) => sum + (item.sale_price * item.quantity), 0)
+    const subtotal = cart.reduce((sum, item) => sum + (item.sale_price * item.quantity), 0)
+    const discountAmount = discountType === 'percent'
+        ? (subtotal * Math.min(discountValue, 100)) / 100
+        : Math.min(discountValue, subtotal)
+    const total = subtotal - discountAmount
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -59,8 +65,8 @@ export function SalesForm() {
         setError(null)
 
         const result = await createSale({
-            total_gross: total,
-            total_net: total, // For now net = gross
+            total_gross: subtotal,
+            total_net: total,
             payment_method: paymentMethod,
             items: cart.map(item => ({
                 product_id: item.id,
@@ -156,8 +162,8 @@ export function SalesForm() {
                                         key={method.id}
                                         onClick={() => setPaymentMethod(method.id)}
                                         className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border transition-all ${paymentMethod === method.id
-                                                ? 'bg-accent/10 border-accent text-accent shadow-lg shadow-accent/10'
-                                                : 'bg-surface border-white/5 text-text-muted hover:bg-white/5'
+                                            ? 'bg-accent/10 border-accent text-accent shadow-lg shadow-accent/10'
+                                            : 'bg-surface border-white/5 text-text-muted hover:bg-white/5'
                                             }`}
                                     >
                                         <Icon className="w-6 h-6" />
@@ -171,12 +177,55 @@ export function SalesForm() {
                     <div className="pt-6 border-t border-white/5 space-y-4">
                         <div className="flex justify-between items-center text-text-muted">
                             <span>Subtotal</span>
-                            <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span>
+                            <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-text-muted">
-                            <span>Desconto</span>
-                            <span className="text-green-500">- R$ 0,00</span>
+
+                        {/* Desconto interativo */}
+                        <div className="space-y-3 p-4 bg-white/[0.03] border border-white/5 rounded-xl">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-bold text-text-primary">Desconto</span>
+                                <div className="flex items-center gap-1 bg-surface rounded-lg p-0.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDiscountType('percent')}
+                                        className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${discountType === 'percent'
+                                                ? 'bg-accent text-white shadow-sm'
+                                                : 'text-text-muted hover:text-text-primary'
+                                            }`}
+                                    >
+                                        <Percent className="w-3 h-3" />
+                                        %
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDiscountType('fixed')}
+                                        className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${discountType === 'fixed'
+                                                ? 'bg-accent text-white shadow-sm'
+                                                : 'text-text-muted hover:text-text-primary'
+                                            }`}
+                                    >
+                                        R$
+                                    </button>
+                                </div>
+                            </div>
+                            <Input
+                                type="number"
+                                min={0}
+                                max={discountType === 'percent' ? 100 : subtotal}
+                                step={discountType === 'percent' ? 1 : 0.01}
+                                value={discountValue || ''}
+                                onChange={(e) => setDiscountValue(Number(e.target.value) || 0)}
+                                placeholder={discountType === 'percent' ? 'Ex: 10' : 'Ex: 15.00'}
+                                className="bg-background border-white/10 text-center text-lg font-bold"
+                            />
+                            {discountAmount > 0 && (
+                                <div className="flex justify-between items-center text-green-500 text-sm">
+                                    <span>Desconto aplicado</span>
+                                    <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountAmount)}</span>
+                                </div>
+                            )}
                         </div>
+
                         <div className="flex justify-between items-center pt-4">
                             <span className="text-xl font-bold text-text-primary">Total</span>
                             <span className="text-2xl font-black text-accent">

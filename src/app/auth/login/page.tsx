@@ -66,9 +66,9 @@ export default function LoginPage() {
                             damping: 20,
                             delay: 0.2
                         }}
-                        className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-accent to-orange-600 shadow-xl shadow-accent/20 mb-4 border border-white/10"
+                        className="inline-flex items-center justify-center w-24 h-24 rounded-2xl overflow-hidden shadow-xl shadow-accent/20 mb-4 border border-white/10"
                     >
-                        <span className="text-white font-bold text-4xl">M</span>
+                        <img src="/mascote.png" alt="Manu Acessórios" className="w-full h-full object-cover" />
                     </motion.div>
                     <motion.h1
                         initial={{ opacity: 0 }}
