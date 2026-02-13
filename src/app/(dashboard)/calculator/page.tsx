@@ -15,21 +15,28 @@ export default function CalculatorPage() {
 
     const calculations = useMemo(() => {
         const costVal = parseFloat(cost.replace(",", ".")) || 0
-        const marginVal = parseFloat(margin) || 0
-        const taxVal = parseFloat(tax) || 0
-        const laborVal = parseFloat(labor) || 0
+        const markupPercent = parseFloat(margin) || 0
+        const taxPercent = parseFloat(tax) || 0
+        const laborPercent = parseFloat(labor) || 0
 
-        // Cálculo Baseado em Markup sobre Venda
-        // Preço = Custo / (1 - (MargemLiq + Imposto + MaoDeObra))
+        // Nova Fórmula: Markup sobre Custo
+        // Preço sugerido deve cobrir o custo + o lucro desejado (markup) 
+        // E também as taxas que incidem sobre o preço FINAL (impostos e comissões)
+
+        // Lucro desejado em valor absoluto
+        const desiredProfit = costVal * (markupPercent / 100)
+
+        // Taxas sobre o faturamento total (venda)
+        const totalFeesRate = (taxPercent + laborPercent) / 100
 
         let salePrice = 0
-        const combinedRate = (marginVal + taxVal + laborVal) / 100
 
-        if (combinedRate < 1) {
-            salePrice = costVal / (1 - combinedRate)
+        if (totalFeesRate < 1) {
+            // Fórmula: (Custo + Lucro) / (1 - Taxas)
+            salePrice = (costVal + desiredProfit) / (1 - totalFeesRate)
         }
 
-        const profit = salePrice - costVal - (salePrice * (taxVal / 100)) - (salePrice * (laborVal / 100))
+        const profit = salePrice > 0 ? salePrice - costVal - (salePrice * totalFeesRate) : 0
         const realMargin = salePrice > 0 ? (profit / salePrice) * 100 : 0
 
         return {
