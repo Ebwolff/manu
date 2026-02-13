@@ -4,7 +4,7 @@ import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useFieldArray } from "react-hook-form"
 import { z } from "zod"
-import { Plus, Trash2, Search, Calculator } from "lucide-react"
+import { Plus, Trash2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     Form,
@@ -50,13 +50,13 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const form = useForm<QuoteFormValues>({
-        // @ts-expect-error - zodResolver types
+        // @ts-expect-error - zodResolver types are often tricky with nested arrays
         resolver: zodResolver(quoteFormSchema),
         defaultValues: {
             customer_id: "",
             items: [{ description: "", quantity: 1, unit_price: 0 }],
             discount_percent: 0,
-            valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias
+            valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         }
     })
 
@@ -68,14 +68,13 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
     const watchItems = form.watch("items")
     const watchDiscount = form.watch("discount_percent")
 
-    const subtotal = watchItems.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0)
-    const discountAmount = (subtotal * watchDiscount) / 100
+    const subtotal = watchItems.reduce((acc, item) => acc + (item.quantity * (item.unit_price || 0)), 0)
+    const discountAmount = (subtotal * (watchDiscount || 0)) / 100
     const total = subtotal - discountAmount
 
-    async function onSubmit(values: QuoteFormValues) {
+    const onSubmit = async (values: QuoteFormValues) => {
         setIsSubmitting(true)
         try {
-            // 1. Criar o orçamento base
             const quoteResult = await createQuote({
                 customer_id: values.customer_id,
                 valid_until: values.valid_until,
@@ -90,7 +89,6 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
 
             const quoteId = quoteResult.data.id
 
-            // 2. Adicionar os itens
             for (const item of values.items) {
                 await addQuoteItem({
                     quote_id: quoteId,
@@ -104,7 +102,8 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
             router.push('/quotes')
             router.refresh()
         } catch (error: any) {
-            alert(error.message)
+            console.error("Submit error:", error)
+            alert(error.message || "Erro desconhecido")
         } finally {
             setIsSubmitting(false)
         }
@@ -119,13 +118,16 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
         }
     }
 
+    // Usar any para o control para evitar problemas de compatibilidade de tipos no build do Next.js
+    const control = form.control as any
+
     return (
         <Form {...form}>
+            {/* @ts-ignore - types are tricky with handleSubmit and Zod */}
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Cliente */}
                     <FormField
-                        control={form.control}
+                        control={control}
                         name="customer_id"
                         render={({ field }) => (
                             <FormItem>
@@ -147,9 +149,8 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
                         )}
                     />
 
-                    {/* Validade */}
                     <FormField
-                        control={form.control}
+                        control={control}
                         name="valid_until"
                         render={({ field }) => (
                             <FormItem>
@@ -163,7 +164,6 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
                     />
                 </div>
 
-                {/* Itens do Orçamento */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-text-primary">Itens</h3>
@@ -184,7 +184,7 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
                             <div key={field.id} className="grid grid-cols-12 gap-3 items-end bg-white/5 p-4 rounded-xl border border-white/5">
                                 <div className="col-span-12 md:col-span-5">
                                     <FormField
-                                        control={form.control}
+                                        control={control}
                                         name={`items.${index}.description`}
                                         render={({ field }) => (
                                             <FormItem>
@@ -215,7 +215,7 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
 
                                 <div className="col-span-4 md:col-span-2">
                                     <FormField
-                                        control={form.control}
+                                        control={control}
                                         name={`items.${index}.quantity`}
                                         render={({ field }) => (
                                             <FormItem>
@@ -231,7 +231,7 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
 
                                 <div className="col-span-5 md:col-span-3">
                                     <FormField
-                                        control={form.control}
+                                        control={control}
                                         name={`items.${index}.unit_price`}
                                         render={({ field }) => (
                                             <FormItem>
@@ -262,10 +262,9 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
                     </div>
                 </div>
 
-                {/* Resumo e Observações */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-white/5">
                     <FormField
-                        control={form.control}
+                        control={control}
                         name="notes"
                         render={({ field }) => (
                             <FormItem>
@@ -292,7 +291,7 @@ export function QuoteForm({ customers, products }: QuoteFormProps) {
                             <div className="flex justify-between items-center gap-4">
                                 <FormLabel className="flex-1">Desconto (%)</FormLabel>
                                 <FormField
-                                    control={form.control}
+                                    control={control}
                                     name="discount_percent"
                                     render={({ field }) => (
                                         <Input

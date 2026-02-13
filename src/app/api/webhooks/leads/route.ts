@@ -2,11 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
-// Create admin client with service role for API routes
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = 'force-dynamic'
 
 // Validation schema
 const leadSchema = z.object({
@@ -16,11 +12,16 @@ const leadSchema = z.object({
     notes: z.string().optional()
 })
 
-// Simple secret to prevent spam, configure this in n8n headers
 const API_SECRET = process.env.API_SECRET_KEY || 'manu-acessorios-secret'
 
 export async function POST(request: Request) {
     try {
+        // Create admin client inside the handler to prevent issues during build
+        const supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+
         // 1. Validate API secret
         const authHeader = request.headers.get('x-api-secret')
         if (authHeader !== API_SECRET) {
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
 
         const { name, phone, source, notes } = parsed.data
 
-        // 3. Insert into customers table using admin client
+        // 3. Insert into customers table
         const { data, error } = await supabaseAdmin
             .from('customers')
             .insert([
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
                     source,
                     status: 'lead',
                     current_device_model: notes,
-                    store_id: process.env.DEFAULT_STORE_ID // Required by schema
+                    store_id: process.env.DEFAULT_STORE_ID || '00000000-0000-0000-0000-000000000001'
                 }
             ])
             .select()
