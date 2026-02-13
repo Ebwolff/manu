@@ -25,7 +25,6 @@ import { useRouter } from "next/navigation"
 import { calculateSuggestedPrice } from "@/lib/pricing-config"
 import { Product } from "@/types/schema"
 
-// Product types for quick selection
 const PRODUCT_TYPES = [
     "Simples",
     "Premium",
@@ -75,7 +74,6 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
         },
     })
 
-    // Type-safe control wrapper to fix FormField compatibility
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const control = form.control as any
 
@@ -83,36 +81,40 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
 
-        // Calculate sale price automatically using pricing rules
         const sale_price = calculateSuggestedPrice(values.cost_price)
+
+        // Mapear campos para o schema do Supabase e remover campos extras (product_type/compatible_model)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { product_type, compatible_model, ...rest } = values;
+
+        const payload = {
+            ...rest,
+            sale_price,
+            compatible_models: values.compatible_model ? [values.compatible_model] : [],
+        }
 
         if (isEditing && product) {
             const { error } = await supabase
                 .from('products')
-                .update({
-                    ...values,
-                    sale_price,
-                    updated_at: new Date().toISOString()
-                })
+                .update(payload)
                 .eq('id', product.id)
 
             if (error) {
-                console.error(error)
-                alert("Erro ao atualizar produto")
+                console.error("Update error:", error)
+                alert(`Erro ao atualizar produto: ${error.message}`)
             } else {
                 router.refresh()
                 if (onClose) onClose()
             }
         } else {
             const { error } = await supabase.from('products').insert({
-                ...values,
-                sale_price,
+                ...payload,
                 store_id: user?.id || '00000000-0000-0000-0000-000000000001',
             })
 
             if (error) {
-                console.error(error)
-                alert("Erro ao salvar produto")
+                console.error("Insert error:", error)
+                alert(`Erro ao salvar produto: ${error.message}`)
             } else {
                 router.refresh()
                 if (onClose) onClose()
@@ -120,7 +122,6 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
         }
     }
 
-    // Preview of calculated sale price
     const costPrice = form.watch("cost_price")
     const previewSalePrice = costPrice > 0 ? calculateSuggestedPrice(costPrice) : 0
 
@@ -164,14 +165,13 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
                         <FormItem>
                             <FormLabel>Nome do Produto</FormLabel>
                             <FormControl>
-                                <Input placeholder="Capa Anti-Impacto Premium" {...field} />
+                                <Input placeholder="Nome do Produto" {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
                     )}
                 />
 
-                {/* Modelo Compatível e Tipo */}
                 <div className="flex gap-4">
                     <FormField
                         control={control}
@@ -200,7 +200,7 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
                                     </FormControl>
                                     <SelectContent className="bg-surface border-white/10">
                                         {PRODUCT_TYPES.map((type) => (
-                                            <SelectItem key={type} value={type} className="hover:bg-white/5">
+                                            <SelectItem key={type} value={type}>
                                                 {type}
                                             </SelectItem>
                                         ))}
@@ -220,7 +220,7 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
                             <FormItem className="flex-1">
                                 <FormLabel>Categoria</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Capinhas" {...field} />
+                                    <Input placeholder="Smartphone, Acessórios..." {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -241,7 +241,6 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
                     />
                 </div>
 
-                {/* Preview of calculated sale price */}
                 {costPrice > 0 && (
                     <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 text-sm">
                         <div className="flex justify-between items-center">
@@ -250,7 +249,6 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(previewSalePrice)}
                             </span>
                         </div>
-                        <p className="text-xs text-text-muted mt-1">Baseado nas regras de precificação configuradas.</p>
                     </div>
                 )}
 
