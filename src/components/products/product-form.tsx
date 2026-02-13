@@ -23,6 +23,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { calculateSuggestedPrice } from "@/lib/pricing-config"
+import { Product } from "@/types/schema"
 
 // Product types for quick selection
 const PRODUCT_TYPES = [
@@ -43,27 +44,34 @@ const formSchema = z.object({
     category: z.string().min(2),
     compatible_model: z.string().optional(),
     product_type: z.string().optional(),
-    cost_price: z.coerce.number().min(0.01, "Informe o valor de aquisição"),
+    cost_price: z.coerce.number().min(0, "Informe o valor de aquisição"),
     current_stock: z.coerce.number().int().min(0),
     min_stock: z.coerce.number().int().min(0),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
-export function ProductForm({ onClose }: { onClose?: () => void }) {
+interface ProductFormProps {
+    product?: Product
+    onClose?: () => void
+}
+
+export function ProductForm({ product, onClose }: ProductFormProps) {
     const router = useRouter()
+    const isEditing = !!product
+
     const form = useForm<FormValues>({
         // @ts-expect-error - zodResolver types are incompatible with react-hook-form v7.54+
         resolver: zodResolver(formSchema),
         defaultValues: {
-            sku: "",
-            name: "",
-            category: "Capinhas",
-            compatible_model: "",
+            sku: product?.sku || "",
+            name: product?.name || "",
+            category: product?.category || "Smartphone",
+            compatible_model: product?.compatible_models?.[0] || "",
             product_type: "Simples",
-            cost_price: 0,
-            current_stock: 0,
-            min_stock: 5,
+            cost_price: product?.cost_price || 0,
+            current_stock: product?.current_stock || 0,
+            min_stock: product?.min_stock || 5,
         },
     })
 
@@ -73,24 +81,42 @@ export function ProductForm({ onClose }: { onClose?: () => void }) {
 
     async function onSubmit(values: FormValues) {
         const supabase = createClient()
-
         const { data: { user } } = await supabase.auth.getUser()
 
         // Calculate sale price automatically using pricing rules
         const sale_price = calculateSuggestedPrice(values.cost_price)
 
-        const { error } = await supabase.from('products').insert({
-            ...values,
-            sale_price,
-            store_id: user?.id || '00000000-0000-0000-0000-000000000000',
-        })
+        if (isEditing && product) {
+            const { error } = await supabase
+                .from('products')
+                .update({
+                    ...values,
+                    sale_price,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', product.id)
 
-        if (error) {
-            console.error(error)
-            alert("Erro ao salvar produto")
+            if (error) {
+                console.error(error)
+                alert("Erro ao atualizar produto")
+            } else {
+                router.refresh()
+                if (onClose) onClose()
+            }
         } else {
-            router.refresh()
-            if (onClose) onClose()
+            const { error } = await supabase.from('products').insert({
+                ...values,
+                sale_price,
+                store_id: user?.id || '00000000-0000-0000-0000-000000000001',
+            })
+
+            if (error) {
+                console.error(error)
+                alert("Erro ao salvar produto")
+            } else {
+                router.refresh()
+                if (onClose) onClose()
+            }
         }
     }
 
@@ -228,7 +254,9 @@ export function ProductForm({ onClose }: { onClose?: () => void }) {
                     </div>
                 )}
 
-                <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-white font-bold">Salvar Produto</Button>
+                <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-white font-bold">
+                    {isEditing ? "Atualizar Produto" : "Salvar Produto"}
+                </Button>
             </form>
         </Form>
     )
