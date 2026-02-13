@@ -48,8 +48,10 @@ export default function NewPurchasePage() {
 
     // New Item Form
     const [newItemSku, setNewItemSku] = useState("")
+    const [newItemName, setNewItemName] = useState("")
     const [newItemQty, setNewItemQty] = useState(1)
     const [newItemPrice, setNewItemPrice] = useState(0)
+    const [isNewProduct, setIsNewProduct] = useState(false)
 
     // Calculated Totals
     const totalProducts = items.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0)
@@ -60,15 +62,30 @@ export default function NewPurchasePage() {
     const handleAddItem = async () => {
         if (!newItemSku || newItemPrice <= 0) return
 
-        // Fetch product name from SKU
-        const { data: products } = await supabase
-            .from('products')
-            .select('id, name')
-            .eq('sku', newItemSku)
-            .single()
+        if (isNewProduct && !newItemName) {
+            alert("Por favor, informe o nome do novo produto.")
+            return
+        }
 
-        const productName = products?.name || "Produto Desconhecido (Novo)"
-        const productId = products?.id
+        let productId: string | undefined
+        let productName = newItemName
+
+        if (!isNewProduct) {
+            const { data: product } = await supabase
+                .from('products')
+                .select('id, name')
+                .eq('sku', newItemSku)
+                .maybeSingle()
+
+            if (product) {
+                productId = product.id
+                productName = product.name
+            } else {
+                setIsNewProduct(true)
+                alert("Produto não encontrado. Informe o nome para cadastrá-lo.")
+                return
+            }
+        }
 
         const newItem: PurchaseItem = {
             tempId: crypto.randomUUID(),
@@ -81,8 +98,10 @@ export default function NewPurchasePage() {
 
         setItems([...items, newItem])
         setNewItemSku("")
+        setNewItemName("")
         setNewItemQty(1)
         setNewItemPrice(0)
+        setIsNewProduct(false)
     }
 
     const removeItem = (id: string) => {
@@ -91,22 +110,25 @@ export default function NewPurchasePage() {
 
     // Save Handler
     const handleSave = async () => {
+        if (!supplier) {
+            alert("Por favor, informe o fornecedor.")
+            return
+        }
+
         setLoading(true)
 
-        // Calculate distribution logic for payload
-        // Now also calculate the suggested sale price on the CLIENT side using localStorage config
         const processedItems = items.map(item => {
             const subtotal = item.quantity * item.unit_price
             const weight = totalProducts > 0 ? (subtotal / totalProducts) : 0
             const shareOfExtras = totalExtras * weight
             const extraPerUnit = shareOfExtras / item.quantity
             const effective_unit_cost = item.unit_price + extraPerUnit
-
-            // Calculate sale price using user's pricing config from localStorage
             const suggested_sale_price = calculateSuggestedPrice(effective_unit_cost)
 
             return {
                 product_id: item.product_id!,
+                product_sku: item.product_sku,
+                product_name: item.product_name,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
                 effective_unit_cost: effective_unit_cost,
@@ -125,8 +147,6 @@ export default function NewPurchasePage() {
 
         try {
             await processPurchase(payload)
-            // If successful, action redirects. If we are here preventing default, we might want to handle error.
-            // But redirect happens on simple call usually.
         } catch (error) {
             console.error(error)
             alert("Erro ao salvar compra. Verifique o console.")
@@ -226,37 +246,56 @@ export default function NewPurchasePage() {
                             <CardTitle>Adicionar Produtos</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex gap-4 items-end">
-                                <div className="flex-1 space-y-2">
-                                    <Label>SKU do Produto</Label>
-                                    <Input
-                                        placeholder="Busque pelo SKU..."
-                                        value={newItemSku}
-                                        onChange={e => setNewItemSku(e.target.value)}
-                                        className="bg-background border-white/10"
-                                    />
+                            <div className="space-y-4">
+                                <div className="flex gap-4 items-end">
+                                    <div className="flex-1 space-y-2">
+                                        <Label>SKU do Produto</Label>
+                                        <Input
+                                            placeholder="Busque pelo SKU..."
+                                            value={newItemSku}
+                                            onChange={e => setNewItemSku(e.target.value)}
+                                            className="bg-background border-white/10"
+                                        />
+                                    </div>
+                                    {isNewProduct && (
+                                        <div className="flex-[2] space-y-2">
+                                            <Label>Nome do Novo Produto</Label>
+                                            <Input
+                                                placeholder="Nome do produto..."
+                                                value={newItemName}
+                                                onChange={e => setNewItemName(e.target.value)}
+                                                className="bg-background border-white/10 border-accent"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="w-20 space-y-2">
+                                        <Label>Qtd</Label>
+                                        <Input
+                                            type="number"
+                                            value={newItemQty}
+                                            onChange={e => setNewItemQty(Number(e.target.value))}
+                                            className="bg-background border-white/10"
+                                        />
+                                    </div>
+                                    <div className="w-28 space-y-2">
+                                        <Label>Preço Unit.</Label>
+                                        <Input
+                                            type="number"
+                                            value={newItemPrice}
+                                            onChange={e => setNewItemPrice(Number(e.target.value))}
+                                            className="bg-background border-white/10"
+                                        />
+                                    </div>
+                                    <Button onClick={handleAddItem} className="bg-accent hover:bg-accent-hover text-white">
+                                        <Plus className="w-5 h-5" />
+                                    </Button>
                                 </div>
-                                <div className="w-24 space-y-2">
-                                    <Label>Qtd</Label>
-                                    <Input
-                                        type="number"
-                                        value={newItemQty}
-                                        onChange={e => setNewItemQty(Number(e.target.value))}
-                                        className="bg-background border-white/10"
-                                    />
-                                </div>
-                                <div className="w-32 space-y-2">
-                                    <Label>Preço Unit.</Label>
-                                    <Input
-                                        type="number"
-                                        value={newItemPrice}
-                                        onChange={e => setNewItemPrice(Number(e.target.value))}
-                                        className="bg-background border-white/10"
-                                    />
-                                </div>
-                                <Button onClick={handleAddItem} className="bg-accent hover:bg-accent-hover text-white">
-                                    <Plus className="w-5 h-5" />
-                                </Button>
+                                {isNewProduct && (
+                                    <p className="text-xs text-accent animate-pulse font-medium">
+                                        SKU não encontrado. Digite o nome para cadastrar como novo produto.
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -269,42 +308,50 @@ export default function NewPurchasePage() {
                                     <TableHead>Produto</TableHead>
                                     <TableHead className="text-right">Qtd</TableHead>
                                     <TableHead className="text-right">Preço NF</TableHead>
-                                    <TableHead className="text-right text-accent">Custo Real (Est.)</TableHead>
+                                    <TableHead className="text-right text-accent">Novo Custo</TableHead>
+                                    <TableHead className="text-right text-green-500">Novo Venda</TableHead>
                                     <TableHead></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {items.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="h-40 text-center text-text-muted">
+                                        <TableCell colSpan={6} className="h-40 text-center text-text-muted">
                                             Adicione produtos para calcular o custo real.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     items.map(item => {
-                                        // Simple proportional calculation per unit
-                                        // Weight factor = (Item Subtotal / Total Products)
                                         const subtotal = item.quantity * item.unit_price
                                         const weight = totalProducts > 0 ? (subtotal / totalProducts) : 0
                                         const shareOfExtras = totalExtras * weight
                                         const extraPerUnit = shareOfExtras / item.quantity
                                         const realUnitCost = item.unit_price + extraPerUnit
+                                        const suggestedSale = calculateSuggestedPrice(realUnitCost)
 
                                         return (
                                             <TableRow key={item.tempId} className="border-white/5 hover:bg-white/5">
                                                 <TableCell>
                                                     <div className="font-medium text-text-primary">{item.product_name}</div>
-                                                    <div className="text-xs text-text-secondary">{item.product_sku}</div>
+                                                    <div className="text-xs text-text-muted font-mono">{item.product_sku}</div>
                                                 </TableCell>
                                                 <TableCell className="text-right">{item.quantity}</TableCell>
-                                                <TableCell className="text-right text-text-muted">
+                                                <TableCell className="text-right">
                                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unit_price)}
                                                 </TableCell>
-                                                <TableCell className="text-right font-bold text-accent">
+                                                <TableCell className="text-right text-accent font-bold">
                                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(realUnitCost)}
                                                 </TableCell>
-                                                <TableCell>
-                                                    <Button variant="ghost" size="icon" onClick={() => removeItem(item.tempId)} className="text-red-400 hover:text-red-500 hover:bg-red-500/10">
+                                                <TableCell className="text-right text-green-500 font-bold">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(suggestedSale)}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => removeItem(item.tempId)}
+                                                        className="text-text-muted hover:text-red-500"
+                                                    >
                                                         <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                 </TableCell>
@@ -316,23 +363,34 @@ export default function NewPurchasePage() {
                         </Table>
                     </div>
 
-                    {/* Footer / Total */}
-                    <div className="flex justify-between items-center p-6 bg-surface rounded-xl border border-white/5">
-                        <div className="text-text-secondary">
-                            <p>Total Produtos: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalProducts)}</p>
-                            <p>Total Extras: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalExtras)}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-sm text-text-muted">Valor Total da Nota</p>
-                            <p className="text-3xl font-bold text-text-primary">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPurchase)}
-                            </p>
-                        </div>
-                    </div>
-
-                    <Button onClick={handleSave} className="w-full h-12 text-lg font-bold bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20" disabled={items.length === 0 || loading}>
-                        {loading ? "Processando..." : "Confirmar Entrada e Atualizar Custos"}
-                    </Button>
+                    {/* Summary & Save */}
+                    <Card className="bg-surface border-white/5">
+                        <CardContent className="pt-6">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-sm text-text-muted">Total da Compra</p>
+                                    <p className="text-3xl font-bold text-text-primary">
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPurchase)}
+                                    </p>
+                                </div>
+                                <Button
+                                    size="lg"
+                                    onClick={handleSave}
+                                    disabled={loading || items.length === 0}
+                                    className="bg-accent hover:bg-accent-hover text-white gap-2 min-w-[200px]"
+                                >
+                                    {loading ? (
+                                        "Processando..."
+                                    ) : (
+                                        <>
+                                            <Save className="w-5 h-5" />
+                                            Finalizar Entrada
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </div>

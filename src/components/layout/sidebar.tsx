@@ -16,7 +16,8 @@ import {
     Kanban,
     FileText,
     ListTodo,
-    BarChart3
+    BarChart3,
+    ShoppingBag
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
@@ -29,6 +30,7 @@ const menuItems = [
     { href: "/tasks", label: "Tarefas", icon: ListTodo },
     { href: "/products", label: "Produtos", icon: Package },
     { href: "/sales", label: "Vendas", icon: ShoppingCart },
+    { href: "/purchases/new", label: "Compras", icon: ShoppingBag },
     { href: "/customers", label: "Clientes", icon: Users },
     { href: "/reports", label: "Relatórios", icon: BarChart3 },
     { href: "/cashflow", label: "Fluxo de Caixa", icon: Wallet },

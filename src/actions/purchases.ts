@@ -4,19 +4,23 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
+interface ItemPayload {
+    product_id: string
+    quantity: number
+    unit_price: number
+    effective_unit_cost: number
+    suggested_sale_price: number
+    product_sku?: string
+    product_name?: string
+}
+
 interface PurchaseData {
     supplier: string
     invoice_number: string
     freight_cost: number
     tax_cost: number
     other_costs: number
-    items: {
-        product_id: string
-        quantity: number
-        unit_price: number // Invoice Price
-        effective_unit_cost: number // Calculated
-        suggested_sale_price: number // Calculated on client with user's pricing config
-    }[]
+    items: ItemPayload[]
 }
 
 export async function processPurchase(data: PurchaseData) {
@@ -48,14 +52,39 @@ export async function processPurchase(data: PurchaseData) {
 
     const purchaseId = purchase.id
 
-    // 3. Process Items (Insert Item + Update Product)
+    // 3. Process Items (Insert Item + Update/Create Product)
     for (const item of data.items) {
+        let finalProductId = item.product_id
+
+        // If product doesn't exist, create it
+        if (!finalProductId) {
+            const { data: newProduct, error: createError } = await supabase
+                .from('products')
+                .insert({
+                    sku: item.product_sku,
+                    name: item.product_name || "Novo Produto",
+                    cost_price: item.effective_unit_cost,
+                    sale_price: item.suggested_sale_price,
+                    current_stock: 0, // Will be updated below
+                    min_stock: 5,
+                    category: 'Acessórios' // Default category
+                })
+                .select()
+                .single()
+
+            if (createError) {
+                console.error("Error creating new product:", createError)
+                continue
+            }
+            finalProductId = newProduct.id
+        }
+
         // A. Insert Purchase Item
         const { error: itemError } = await supabase
             .from('purchase_items')
             .insert({
                 purchase_id: purchaseId,
-                product_id: item.product_id,
+                product_id: finalProductId,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
                 effective_unit_cost: item.effective_unit_cost,
@@ -67,11 +96,10 @@ export async function processPurchase(data: PurchaseData) {
         }
 
         // B. Update Product (Stock + Cost Price + Sale Price)
-        const { data: product } = await supabase.from('products').select('current_stock').eq('id', item.product_id).single()
+        const { data: product } = await supabase.from('products').select('current_stock').eq('id', finalProductId).single()
         const currentStock = product?.current_stock || 0
         const newStock = currentStock + item.quantity
 
-        // Use the sale price calculated by the client (using their pricing config from localStorage)
         await supabase
             .from('products')
             .update({
@@ -79,7 +107,7 @@ export async function processPurchase(data: PurchaseData) {
                 cost_price: item.effective_unit_cost,
                 sale_price: item.suggested_sale_price
             })
-            .eq('id', item.product_id)
+            .eq('id', finalProductId)
     }
 
     revalidatePath('/products')
