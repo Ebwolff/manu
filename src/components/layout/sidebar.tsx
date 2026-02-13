@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
     LayoutDashboard,
     Package,
@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 
 const menuItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -36,7 +37,15 @@ const menuItems = [
 
 export function Sidebar() {
     const pathname = usePathname()
+    const router = useRouter()
     const [collapsed, setCollapsed] = useState(false)
+
+    const handleLogout = async () => {
+        const supabase = createClient()
+        await supabase.auth.signOut()
+        router.push("/auth/login")
+        router.refresh()
+    }
 
     return (
         <aside className={cn(
@@ -85,7 +94,7 @@ export function Sidebar() {
             </nav>
 
             {/* Footer */}
-            <div className="px-3 py-4 border-t border-white/5">
+            <div className="px-3 py-4 border-t border-white/5 space-y-1">
                 <Link
                     href="/settings"
                     className="flex items-center gap-3 px-4 py-3 rounded-lg text-text-secondary hover:bg-white/5 hover:text-text-primary transition-all"
@@ -93,6 +102,14 @@ export function Sidebar() {
                     <Settings className="w-5 h-5" />
                     {!collapsed && <span className="font-medium">Configurações</span>}
                 </Link>
+
+                <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-all font-medium"
+                >
+                    <LogOut className="w-5 h-5" />
+                    {!collapsed && <span>Sair do Sistema</span>}
+                </button>
             </div>
 
             {/* Collapse Toggle */}

@@ -164,12 +164,6 @@ export default function LoginPage() {
                             )}
                         </Button>
                     </form>
-
-                    <div className="mt-8 text-center flex flex-col gap-2">
-                        <Link href="/auth/signup" className="text-sm text-text-muted hover:text-accent transition-colors font-medium">
-                            Não tem uma conta? <span className="text-accent underline underline-offset-4 decoration-accent/30">Criar agora</span>
-                        </Link>
-                    </div>
                 </div>
 
                 <motion.p
